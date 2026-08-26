@@ -1,45 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import { jwtVerify } from "jose";
 
-const secret = new TextEncoder().encode(
-  process.env.AUTH_SECRET || "temporary-secret"
-);
-
-export async function middleware(request: NextRequest) {
-  const token = request.cookies.get("auth-token")?.value;
+export function middleware(request: NextRequest) {
+  const auth = request.cookies.get("auth")?.value;
+  const role = request.cookies.get("role")?.value;
 
   const pathname = request.nextUrl.pathname;
 
-  // Страница входа доступна без авторизации
+  // Страница входа доступна всем
   if (pathname === "/login") {
     return NextResponse.next();
   }
 
-  // API входа доступен без авторизации
-  if (pathname.startsWith("/api/login")) {
-    return NextResponse.next();
+  // Если пользователь не вошёл —
+  // отправляем его на страницу входа
+  if (auth !== "true") {
+    const loginUrl = new URL("/login", request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
-  // Если токена нет — отправляем на страницу входа
-  if (!token) {
-    return NextResponse.redirect(
-      new URL("/login", request.url)
-    );
+  // Админ-панель доступна только администратору
+  if (pathname.startsWith("/admin")) {
+    if (role !== "admin") {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
   }
 
-  try {
-    await jwtVerify(token, secret);
-
-    return NextResponse.next();
-  } catch {
-    const response = NextResponse.redirect(
-      new URL("/login", request.url)
-    );
-
-    response.cookies.delete("auth-token");
-
-    return response;
-  }
+  // Остальные страницы доступны всем авторизованным пользователям
+  return NextResponse.next();
 }
 
 export const config = {
