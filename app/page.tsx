@@ -1,3 +1,5 @@
+import LogoutButton from "./LogoutButton";
+
 const categories = [
   {
     title: "Регламент работы",
@@ -69,6 +71,7 @@ export default function Home() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
 
+          {/* ЛОГОТИП */}
           <a href="/" className="group">
             <h1 className="text-2xl font-bold group-hover:text-blue-600">
               База знаний
@@ -79,7 +82,8 @@ export default function Home() {
             </p>
           </a>
 
-          <nav className="hidden gap-6 text-sm font-medium md:flex">
+          {/* МЕНЮ */}
+          <nav className="flex items-center gap-6 text-sm font-medium">
 
             <a
               href="#categories"
@@ -101,6 +105,8 @@ export default function Home() {
             >
               Админ-панель
             </a>
+
+            <LogoutButton />
 
           </nav>
 
@@ -127,7 +133,7 @@ export default function Home() {
             </p>
 
 
-            {/* SEARCH */}
+            {/* ПОИСК */}
             <div className="mt-8 flex overflow-hidden rounded-2xl bg-white shadow-xl">
 
               <input
