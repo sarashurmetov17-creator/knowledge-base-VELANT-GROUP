@@ -6,98 +6,95 @@ export default function LoginPage() {
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     setError("");
+    setLoading(true);
 
     if (!login || !password) {
       setError("Введите логин и пароль");
+      setLoading(false);
       return;
     }
 
-    // Временная проверка для тестирования.
-    // В следующей части сделаем нормальную авторизацию.
-    if (login === "admin" && password === "admin123") {
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          login,
+          password,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.message || "Неверный логин или пароль");
+        setLoading(false);
+        return;
+      }
+
       window.location.href = "/";
-      return;
+    } catch {
+      setError("Не удалось подключиться к серверу");
+      setLoading(false);
     }
-
-    setError("Неверный логин или пароль");
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-md">
+    <main className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900">
+      <div className="mx-auto flex min-h-[80vh] max-w-md items-center justify-center">
+        <div className="w-full rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
 
-        {/* ЛОГОТИП */}
-        <div className="mb-8 text-center">
-          <a
-            href="/"
-            className="text-3xl font-bold text-slate-900 hover:text-blue-600"
-          >
-            OOO Velant Group
-          </a>
+          {/* ЗАГОЛОВОК */}
+          <div className="text-center">
+            <h1 className="text-3xl font-bold">
+              База знаний
+            </h1>
 
-          <p className="mt-2 text-sm text-slate-500">
-            База знаний
-          </p>
-        </div>
+            <p className="mt-2 text-sm text-slate-500">
+              Вход для сотрудников
+            </p>
+          </div>
 
-        {/* ФОРМА */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-
-          <h1 className="text-2xl font-bold text-slate-900">
-            Вход в систему
-          </h1>
-
-          <p className="mt-2 text-sm text-slate-500">
-            Введите логин и пароль для доступа к базе знаний.
-          </p>
-
-          <form
-            onSubmit={handleSubmit}
-            className="mt-8 space-y-5"
-          >
+          {/* ФОРМА */}
+          <form onSubmit={handleSubmit} className="mt-8 space-y-5">
 
             {/* ЛОГИН */}
             <div>
-              <label
-                htmlFor="login"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
+              <label className="mb-2 block text-sm font-medium">
                 Логин
               </label>
 
               <input
-                id="login"
                 type="text"
                 value={login}
                 onChange={(event) => setLogin(event.target.value)}
                 placeholder="Введите логин"
-                autoComplete="username"
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={loading}
               />
             </div>
 
             {/* ПАРОЛЬ */}
             <div>
-              <label
-                htmlFor="password"
-                className="mb-2 block text-sm font-medium text-slate-700"
-              >
+              <label className="mb-2 block text-sm font-medium">
                 Пароль
               </label>
 
               <input
-                id="password"
                 type="password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Введите пароль"
-                autoComplete="current-password"
                 className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                disabled={loading}
               />
             </div>
 
@@ -111,9 +108,10 @@ export default function LoginPage() {
             {/* КНОПКА */}
             <button
               type="submit"
-              className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700"
+              disabled={loading}
+              className="w-full rounded-xl bg-blue-600 px-4 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Войти
+              {loading ? "Выполняется вход..." : "Войти"}
             </button>
 
           </form>
@@ -124,7 +122,6 @@ export default function LoginPage() {
         <p className="mt-6 text-center text-xs text-slate-400">
           Доступ только для сотрудников
         </p>
-
       </div>
     </main>
   );
