@@ -9,7 +9,7 @@ const categories = [
   {
     title: "Инструкции",
     description: "Пошаговые руководства и инструкции",
-    count: 24,
+    count: 4,
     icon: "📚",
     href: "/instructions",
   },
