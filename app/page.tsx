@@ -1,17 +1,17 @@
 const categories = [
-{
-  title: "Регламент работы",
-  description: "Порядок работы сотрудников по сменам",
-  count: 3,
-  icon: "📋",
-  href: "/work-regulations",
-},
+  {
+    title: "Регламент работы",
+    description: "Порядок работы сотрудников по сменам",
+    count: 3,
+    icon: "📋",
+    href: "/work-regulations",
+  },
   {
     title: "Инструкции",
     description: "Пошаговые руководства и инструкции",
     count: 24,
     icon: "📚",
-    href: "#",
+    href: "/instructions",
   },
   {
     title: "Настройки",
