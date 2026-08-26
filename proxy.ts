@@ -3,23 +3,31 @@ import { NextRequest, NextResponse } from "next/server";
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Страница входа доступна без авторизации
+  const auth = request.cookies.get("auth")?.value;
+  const role = request.cookies.get("role")?.value;
+
+  // Страница входа доступна всем
   if (pathname === "/login") {
     return NextResponse.next();
   }
 
-  // Проверяем наличие авторизации
-  const auth = request.cookies.get("auth")?.value;
-
-  // Если пользователь не авторизован —
-  // отправляем его на страницу входа
+  // Если пользователь не авторизован
   if (auth !== "true") {
-    const loginUrl = new URL("/login", request.url);
-
-    return NextResponse.redirect(loginUrl);
+    return NextResponse.redirect(
+      new URL("/login", request.url)
+    );
   }
 
-  // Пользователь авторизован
+  // Админ-панель доступна только администратору
+  if (
+    pathname.startsWith("/admin") &&
+    role !== "admin"
+  ) {
+    return NextResponse.redirect(
+      new URL("/", request.url)
+    );
+  }
+
   return NextResponse.next();
 }
 
