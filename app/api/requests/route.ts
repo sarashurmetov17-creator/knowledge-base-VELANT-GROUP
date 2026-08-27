@@ -2,37 +2,67 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_SECRET_KEY;
+const supabaseSecretKey = process.env.SUPABASE_SECRET_KEY;
 
 if (!supabaseUrl) {
   throw new Error("NEXT_PUBLIC_SUPABASE_URL не задан");
 }
 
-if (!supabaseKey) {
+if (!supabaseSecretKey) {
   throw new Error("SUPABASE_SECRET_KEY не задан");
 }
 
 const supabase = createClient(
   supabaseUrl,
-  supabaseKey
+  supabaseSecretKey
 );
 
-
-// =====================================================
-// PUT — редактировать существующий запрос
-// =====================================================
-
-export async function PUT(
-  request: Request,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
-) {
+// GET — получить все запросы
+export async function GET() {
   try {
-    const { id } = await context.params;
+    const { data, error } = await supabase
+      .from("requests")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      });
 
+    if (error) {
+      console.error("GET requests error:", error);
+
+      return NextResponse.json(
+        {
+          error: error.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    return NextResponse.json(data ?? [], {
+      status: 200,
+    });
+  } catch (error) {
+    console.error("GET /api/requests error:", error);
+
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Ошибка сервера",
+      },
+      {
+        status: 500,
+      }
+    );
+  }
+}
+
+// POST — создать новый запрос
+export async function POST(request: Request) {
+  try {
     const body = await request.json();
 
     const {
@@ -47,27 +77,6 @@ export async function PUT(
       deadline,
       status,
     } = body;
-
-
-    // -----------------------------------------------
-    // Проверяем ID
-    // -----------------------------------------------
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          error: "Не указан ID запроса",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-
-    // -----------------------------------------------
-    // Проверяем обязательные поля
-    // -----------------------------------------------
 
     if (
       !company ||
@@ -87,40 +96,25 @@ export async function PUT(
       );
     }
 
-
-    // -----------------------------------------------
-    // Обновляем запись
-    // -----------------------------------------------
-
-    const { data, error } =
-      await supabase
-        .from("requests")
-        .update({
-          company: company,
-          bank: bank,
-          date: date,
-          problem: problem,
-          comment: comment || null,
-          employee: employee,
-          destination: destination || null,
-          next_steps: nextSteps || null,
-          deadline: deadline || null,
-          status: status,
-        })
-        .eq("id", id)
-        .select()
-        .single();
-
-
-    // -----------------------------------------------
-    // Обработка ошибки
-    // -----------------------------------------------
+    const { data, error } = await supabase
+      .from("requests")
+      .insert({
+        company,
+        bank,
+        date,
+        problem,
+        comment: comment || null,
+        employee,
+        destination: destination || null,
+        next_steps: nextSteps || null,
+        deadline: deadline || null,
+        status,
+      })
+      .select()
+      .single();
 
     if (error) {
-      console.error(
-        "Ошибка редактирования:",
-        error
-      );
+      console.error("POST requests error:", error);
 
       return NextResponse.json(
         {
@@ -132,111 +126,11 @@ export async function PUT(
       );
     }
 
-
-    // -----------------------------------------------
-    // Возвращаем изменённую запись
-    // -----------------------------------------------
-
-    return NextResponse.json(data);
-
-  } catch (error) {
-    console.error(
-      "PUT /api/requests/[id]:",
-      error
-    );
-
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Ошибка сервера",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-
-// =====================================================
-// DELETE — удалить существующий запрос
-// =====================================================
-
-export async function DELETE(
-  request: Request,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
-) {
-  try {
-    const { id } = await context.params;
-
-
-    // -----------------------------------------------
-    // Проверяем ID
-    // -----------------------------------------------
-
-    if (!id) {
-      return NextResponse.json(
-        {
-          error: "Не указан ID запроса",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-
-    // -----------------------------------------------
-    // Удаляем запись
-    // -----------------------------------------------
-
-    const { error } =
-      await supabase
-        .from("requests")
-        .delete()
-        .eq("id", id);
-
-
-    // -----------------------------------------------
-    // Обработка ошибки
-    // -----------------------------------------------
-
-    if (error) {
-      console.error(
-        "Ошибка удаления:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error: error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-
-    // -----------------------------------------------
-    // Успешное удаление
-    // -----------------------------------------------
-
-    return NextResponse.json({
-      success: true,
+    return NextResponse.json(data, {
+      status: 201,
     });
-
   } catch (error) {
-    console.error(
-      "DELETE /api/requests/[id]:",
-      error
-    );
+    console.error("POST /api/requests error:", error);
 
     return NextResponse.json(
       {
