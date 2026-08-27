@@ -1,9 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey =
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SECRET_KEY;
+
+if (!supabaseUrl) {
+  throw new Error("NEXT_PUBLIC_SUPABASE_URL не задан");
+}
+
+if (!supabaseKey) {
+  throw new Error("SUPABASE_SECRET_KEY не задан");
+}
 
 const supabase = createClient(
   supabaseUrl,
@@ -11,7 +18,10 @@ const supabase = createClient(
 );
 
 
+// ==========================================
 // GET — получить все запросы
+// ==========================================
+
 export async function GET() {
   try {
     const { data, error } = await supabase
@@ -22,11 +32,14 @@ export async function GET() {
       });
 
     if (error) {
-      console.error("Ошибка получения запросов:", error);
+      console.error(
+        "Ошибка получения запросов:",
+        error
+      );
 
       return NextResponse.json(
         {
-          error: "Не удалось получить запросы",
+          error: error.message,
         },
         {
           status: 500,
@@ -34,10 +47,13 @@ export async function GET() {
       );
     }
 
-    return NextResponse.json(data);
+    return NextResponse.json(data || []);
 
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Ошибка GET /api/requests:",
+      error
+    );
 
     return NextResponse.json(
       {
@@ -51,10 +67,20 @@ export async function GET() {
 }
 
 
+// ==========================================
 // POST — создать новый запрос
-export async function POST(request: Request) {
+// ==========================================
+
+export async function POST(
+  request: Request
+) {
   try {
     const body = await request.json();
+
+    console.log(
+      "Получен запрос:",
+      body
+    );
 
     const {
       company,
@@ -70,7 +96,9 @@ export async function POST(request: Request) {
     } = body;
 
 
-    // Проверяем обязательные поля
+    // ==========================================
+    // ПРОВЕРКА ОБЯЗАТЕЛЬНЫХ ПОЛЕЙ
+    // ==========================================
 
     if (
       !company ||
@@ -82,7 +110,8 @@ export async function POST(request: Request) {
     ) {
       return NextResponse.json(
         {
-          error: "Не заполнены обязательные поля",
+          error:
+            "Не заполнены обязательные поля",
         },
         {
           status: 400,
@@ -91,34 +120,52 @@ export async function POST(request: Request) {
     }
 
 
-    // Добавляем запись
+    // ==========================================
+    // СОХРАНЕНИЕ В SUPABASE
+    // ==========================================
 
-    const { data, error } = await supabase
-      .from("requests")
-      .insert([
-        {
-          company,
-          bank,
-          date,
-          problem,
+    const { data, error } =
+      await supabase
+        .from("requests")
+        .insert({
+          company: company,
+          bank: bank,
+          date: date,
+          problem: problem,
           comment: comment || null,
-          employee,
-          destination: destination || null,
-          next_steps: nextSteps || null,
-          deadline: deadline || null,
-          status,
-        },
-      ])
-      .select()
-      .single();
+          employee: employee,
+          destination:
+            destination || null,
+          next_steps:
+            nextSteps || null,
+          deadline:
+            deadline || null,
+          status: status,
+        })
+        .select()
+        .single();
 
+
+    // ==========================================
+    // ОШИБКА SUPABASE
+    // ==========================================
 
     if (error) {
-      console.error("Ошибка добавления:", error);
+      console.error(
+        "Ошибка Supabase INSERT:",
+        error
+      );
 
       return NextResponse.json(
         {
-          error: "Не удалось сохранить запрос",
+          error:
+            error.message,
+          details:
+            error.details,
+          hint:
+            error.hint,
+          code:
+            error.code,
         },
         {
           status: 500,
@@ -127,16 +174,35 @@ export async function POST(request: Request) {
     }
 
 
-    return NextResponse.json(data, {
-      status: 201,
-    });
+    console.log(
+      "Запрос успешно сохранён:",
+      data
+    );
+
+
+    // ==========================================
+    // ВОЗВРАЩАЕМ СОХРАНЁННУЮ ЗАПИСЬ
+    // ==========================================
+
+    return NextResponse.json(
+      data,
+      {
+        status: 201,
+      }
+    );
 
   } catch (error) {
-    console.error(error);
+    console.error(
+      "Ошибка POST /api/requests:",
+      error
+    );
 
     return NextResponse.json(
       {
-        error: "Ошибка сервера",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Ошибка сервера",
       },
       {
         status: 500,
