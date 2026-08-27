@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const companies = [
   "СТИГРУПП",
@@ -111,7 +111,31 @@ export default function Dashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const [requests, setRequests] = useState<RequestItem[]>([]);
+useEffect(() => {
+  async function loadRequests() {
+    try {
+      const response = await fetch("/api/requests");
 
+      if (!response.ok) {
+        throw new Error(
+          "Не удалось загрузить запросы"
+        );
+      }
+
+      const data = await response.json();
+
+      setRequests(data);
+
+    } catch (error) {
+      console.error(
+        "Ошибка загрузки запросов:",
+        error
+      );
+    }
+  }
+
+  loadRequests();
+}, []);
   const [form, setForm] = useState({
     company: "",
     bank: "",
@@ -135,38 +159,66 @@ export default function Dashboard() {
     }));
   }
 
-  function addRequest() {
-    if (
-      !form.company ||
-      !form.bank ||
-      !form.date ||
-      !form.problem ||
-      !form.employee ||
-      !form.status
-    ) {
-      alert("Заполните обязательные поля.");
+  async function addRequest() {
+  if (
+    !form.company ||
+    !form.bank ||
+    !form.date ||
+    !form.problem ||
+    !form.employee ||
+    !form.status
+  ) {
+    alert("Заполните обязательные поля.");
+    return;
+  }
+
+  try {
+    const response = await fetch("/api/requests", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(form),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      alert(result.error || "Не удалось сохранить запрос");
       return;
     }
 
-    const newRequest: RequestItem = {
-      id: Date.now(),
-      company: form.company,
-      bank: form.bank,
-      date: form.date,
-      problem: form.problem,
-      comment: form.comment,
-      employee: form.employee,
-      destination: form.destination,
-      nextSteps: form.nextSteps,
-      deadline: form.deadline,
-      status: form.status,
-    };
-
+    // Добавляем сохранённую запись в таблицу
     setRequests((prev) => [
-      newRequest,
+      result,
       ...prev,
     ]);
 
+    // Очищаем форму
+    setForm({
+      company: "",
+      bank: "",
+      date: "",
+      problem: "",
+      comment: "",
+      employee: "",
+      destination: "",
+      nextSteps: "",
+      deadline: "",
+      status: "Контроль",
+    });
+
+    // Закрываем форму
+    setIsFormOpen(false);
+
+  } catch (error) {
+    console.error(error);
+
+    alert(
+      "Не удалось подключиться к серверу."
+    );
+  }
+}
     setForm({
       company: "",
       bank: "",
