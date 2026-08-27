@@ -136,6 +136,8 @@ const emptyForm: FormData = {
 export default function Dashboard() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
+  const [editingId, setEditingId] = useState<number | null>(null);
+
   const [requests, setRequests] = useState<RequestItem[]>([]);
 
   const [form, setForm] = useState<FormData>({
@@ -146,63 +148,69 @@ export default function Dashboard() {
 
   const [isSaving, setIsSaving] = useState(false);
 
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
-  // ==========================================
-  // ЗАГРУЗКА ЗАПРОСОВ ИЗ БАЗЫ
-  // ==========================================
+  // =========================================================
+  // ЗАГРУЗКА ЗАПРОСОВ
+  // =========================================================
+
+  async function loadRequests() {
+    try {
+      setIsLoading(true);
+
+      const response = await fetch("/api/requests", {
+        method: "GET",
+        cache: "no-store",
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error || "Не удалось загрузить запросы"
+        );
+      }
+
+      const formattedData: RequestItem[] = result.map(
+        (item: any) => ({
+          id: item.id,
+          company: item.company,
+          bank: item.bank,
+          date: item.date,
+          problem: item.problem,
+          comment: item.comment,
+          employee: item.employee,
+          destination: item.destination,
+          nextSteps: item.next_steps,
+          deadline: item.deadline,
+          status: item.status,
+        })
+      );
+
+      setRequests(formattedData);
+    } catch (error) {
+      console.error(
+        "Ошибка загрузки запросов:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Не удалось загрузить запросы"
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function loadRequests() {
-      try {
-        setIsLoading(true);
-
-        const response = await fetch("/api/requests", {
-          method: "GET",
-          cache: "no-store",
-        });
-
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            result.error || "Не удалось загрузить запросы"
-          );
-        }
-
-        const formattedData: RequestItem[] = result.map(
-          (item: any) => ({
-            id: item.id,
-            company: item.company,
-            bank: item.bank,
-            date: item.date,
-            problem: item.problem,
-            comment: item.comment,
-            employee: item.employee,
-            destination: item.destination,
-            nextSteps: item.next_steps,
-            deadline: item.deadline,
-            status: item.status,
-          })
-        );
-
-        setRequests(formattedData);
-      } catch (error) {
-        console.error(
-          "Ошибка загрузки запросов:",
-          error
-        );
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
     loadRequests();
   }, []);
 
-
-  // ==========================================
-  // ИЗМЕНЕНИЕ ФОРМЫ
-  // ==========================================
+  // =========================================================
+  // ИЗМЕНЕНИЕ ПОЛЕЙ ФОРМЫ
+  // =========================================================
 
   function updateForm(
     field: keyof FormData,
@@ -214,12 +222,49 @@ export default function Dashboard() {
     }));
   }
 
+  // =========================================================
+  // ОТКРЫТЬ ФОРМУ ДЛЯ НОВОГО ЗАПРОСА
+  // =========================================================
 
-  // ==========================================
-  // СОХРАНЕНИЕ НОВОГО ЗАПРОСА
-  // ==========================================
+  function openForm() {
+    setEditingId(null);
 
-  async function addRequest() {
+    setForm({
+      ...emptyForm,
+    });
+
+    setIsFormOpen(true);
+  }
+
+  // =========================================================
+  // РЕДАКТИРОВАНИЕ
+  // =========================================================
+
+  function editRequest(request: RequestItem) {
+    setEditingId(request.id);
+
+    setForm({
+      company: request.company || "",
+      bank: request.bank || "",
+      date: request.date || "",
+      problem: request.problem || "",
+      comment: request.comment || "",
+      employee: request.employee || "",
+      destination: request.destination || "",
+      nextSteps: request.nextSteps || "",
+      deadline: request.deadline || "",
+      status: request.status || "Контроль",
+    });
+
+    setIsFormOpen(true);
+  }
+
+  // =========================================================
+  // СОХРАНЕНИЕ
+  // НОВЫЙ ЗАПРОС ИЛИ РЕДАКТИРОВАНИЕ
+  // =========================================================
+
+  async function saveRequest() {
     if (
       !form.company ||
       !form.bank ||
@@ -228,69 +273,118 @@ export default function Dashboard() {
       !form.employee ||
       !form.status
     ) {
-      alert(
-        "Заполните обязательные поля."
-      );
-
+      alert("Заполните обязательные поля.");
       return;
     }
 
     try {
       setIsSaving(true);
 
-      const response = await fetch(
-        "/api/requests",
-        {
-          method: "POST",
+      // =====================================================
+      // РЕДАКТИРОВАНИЕ
+      // =====================================================
 
-          headers: {
-            "Content-Type": "application/json",
-          },
-
-          body: JSON.stringify(form),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          result.error ||
-            "Не удалось сохранить запрос"
+      if (editingId !== null) {
+        const response = await fetch(
+          `/api/requests/${editingId}`,
+          {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(form),
+          }
         );
+
+        const result = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Не удалось изменить запрос"
+          );
+        }
+
+        const updatedRequest: RequestItem = {
+          id: result.id,
+          company: result.company,
+          bank: result.bank,
+          date: result.date,
+          problem: result.problem,
+          comment: result.comment,
+          employee: result.employee,
+          destination: result.destination,
+          nextSteps: result.next_steps,
+          deadline: result.deadline,
+          status: result.status,
+        };
+
+        setRequests((prev) =>
+          prev.map((item) =>
+            item.id === editingId
+              ? updatedRequest
+              : item
+          )
+        );
+
+        alert("Запрос успешно изменён.");
       }
 
+      // =====================================================
+      // НОВЫЙ ЗАПРОС
+      // =====================================================
 
-      // Преобразуем данные из Supabase
-      const newRequest: RequestItem = {
-        id: result.id,
-        company: result.company,
-        bank: result.bank,
-        date: result.date,
-        problem: result.problem,
-        comment: result.comment,
-        employee: result.employee,
-        destination: result.destination,
-        nextSteps: result.next_steps,
-        deadline: result.deadline,
-        status: result.status,
-      };
+      else {
+        const response = await fetch(
+          "/api/requests",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(form),
+          }
+        );
 
+        const result = await response.json();
 
-      // Добавляем новую запись в начало таблицы
-      setRequests((prev) => [
-        newRequest,
-        ...prev,
-      ]);
+        if (!response.ok) {
+          throw new Error(
+            result.error ||
+              "Не удалось сохранить запрос"
+          );
+        }
 
+        const newRequest: RequestItem = {
+          id: result.id,
+          company: result.company,
+          bank: result.bank,
+          date: result.date,
+          problem: result.problem,
+          comment: result.comment,
+          employee: result.employee,
+          destination: result.destination,
+          nextSteps: result.next_steps,
+          deadline: result.deadline,
+          status: result.status,
+        };
 
-      // Очищаем форму
+        setRequests((prev) => [
+          newRequest,
+          ...prev,
+        ]);
+      }
+
+      // =====================================================
+      // ОЧИЩАЕМ ФОРМУ
+      // =====================================================
+
       setForm({
         ...emptyForm,
       });
 
+      setEditingId(null);
 
-      // Закрываем форму
       setIsFormOpen(false);
 
     } catch (error) {
@@ -309,50 +403,96 @@ export default function Dashboard() {
     }
   }
 
+  // =========================================================
+  // УДАЛЕНИЕ
+  // =========================================================
 
-  // ==========================================
-  // ОТКРЫТИЕ ФОРМЫ
-  // ==========================================
+  async function deleteRequest(id: number) {
+    const confirmed = window.confirm(
+      "Вы действительно хотите удалить этот запрос?"
+    );
 
-  function openForm() {
-    setForm({
-      ...emptyForm,
-    });
+    if (!confirmed) {
+      return;
+    }
 
-    setIsFormOpen(true);
+    try {
+      setDeletingId(id);
+
+      const response = await fetch(
+        `/api/requests/${id}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error ||
+            "Не удалось удалить запрос"
+        );
+      }
+
+      setRequests((prev) =>
+        prev.filter(
+          (request) => request.id !== id
+        )
+      );
+
+    } catch (error) {
+      console.error(
+        "Ошибка удаления:",
+        error
+      );
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Не удалось удалить запрос"
+      );
+    } finally {
+      setDeletingId(null);
+    }
   }
 
-
-  // ==========================================
-  // ОТМЕНА
-  // ==========================================
+  // =========================================================
+  // ЗАКРЫТИЕ ФОРМЫ
+  // =========================================================
 
   function closeForm() {
+    if (isSaving) {
+      return;
+    }
+
     setForm({
       ...emptyForm,
     });
+
+    setEditingId(null);
 
     setIsFormOpen(false);
   }
 
+  // =========================================================
+  // HTML
+  // =========================================================
 
   return (
     <section
       id="dashboard"
       className="border-b border-slate-200 bg-slate-100"
     >
-
       <div className="mx-auto max-w-7xl px-6 py-12">
 
-
-        {/* ==========================================
-            HEADER DASHBOARD
-        ========================================== */}
+        {/* ===================================================
+            HEADER
+        =================================================== */}
 
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
           <div>
-
             <p className="text-sm font-medium uppercase tracking-wide text-blue-600">
               Dashboard
             </p>
@@ -364,9 +504,7 @@ export default function Dashboard() {
             <p className="mt-2 text-sm text-slate-500">
               Добавление и контроль обращений по компаниям и банкам
             </p>
-
           </div>
-
 
           <button
             type="button"
@@ -378,53 +516,49 @@ export default function Dashboard() {
 
         </div>
 
-
-        {/* ==========================================
+        {/* ===================================================
             ФОРМА
-        ========================================== */}
+        =================================================== */}
 
         {isFormOpen && (
-
           <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
 
             {/* Заголовок */}
 
             <div className="flex items-center justify-between">
 
               <div>
-
                 <h3 className="text-lg font-bold">
-                  Новый запрос
+                  {editingId !== null
+                    ? "Редактирование запроса"
+                    : "Новый запрос"}
                 </h3>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Заполните информацию по задаче
+                  {editingId !== null
+                    ? "Измените необходимые данные"
+                    : "Заполните информацию по задаче"}
                 </p>
-
               </div>
-
 
               <button
                 type="button"
                 onClick={closeForm}
-                className="text-2xl text-slate-400 hover:text-slate-700"
+                disabled={isSaving}
+                className="text-2xl text-slate-400 hover:text-slate-700 disabled:opacity-50"
               >
                 ×
               </button>
 
             </div>
 
-
             {/* Поля */}
 
             <div className="mt-6 grid gap-5 md:grid-cols-2">
 
-
               {/* КОМПАНИЯ */}
 
               <div>
-
                 <label className="mb-2 block text-sm font-medium">
                   Компания *
                 </label>
@@ -439,31 +573,24 @@ export default function Dashboard() {
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
                 >
-
                   <option value="">
                     Выберите компанию
                   </option>
 
-                  {companies.map(
-                    (company) => (
-                      <option
-                        key={company}
-                        value={company}
-                      >
-                        {company}
-                      </option>
-                    )
-                  )}
-
+                  {companies.map((company) => (
+                    <option
+                      key={company}
+                      value={company}
+                    >
+                      {company}
+                    </option>
+                  ))}
                 </select>
-
               </div>
-
 
               {/* БАНК */}
 
               <div>
-
                 <label className="mb-2 block text-sm font-medium">
                   Банк *
                 </label>
@@ -478,31 +605,24 @@ export default function Dashboard() {
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
                 >
-
                   <option value="">
                     Выберите банк
                   </option>
 
-                  {banks.map(
-                    (bank) => (
-                      <option
-                        key={bank}
-                        value={bank}
-                      >
-                        {bank}
-                      </option>
-                    )
-                  )}
-
+                  {banks.map((bank) => (
+                    <option
+                      key={bank}
+                      value={bank}
+                    >
+                      {bank}
+                    </option>
+                  ))}
                 </select>
-
               </div>
 
-
-              {/* ДАТА ПОСТУПЛЕНИЯ */}
+              {/* ДАТА */}
 
               <div>
-
                 <label className="mb-2 block text-sm font-medium">
                   Дата поступления *
                 </label>
@@ -518,14 +638,11 @@ export default function Dashboard() {
                   }
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-
-              {/* КТО ПРИНЯЛ */}
+              {/* СОТРУДНИК */}
 
               <div>
-
                 <label className="mb-2 block text-sm font-medium">
                   Кто принял запрос/задачу *
                 </label>
@@ -540,31 +657,24 @@ export default function Dashboard() {
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
                 >
-
                   <option value="">
                     Выберите сотрудника
                   </option>
 
-                  {employees.map(
-                    (employee) => (
-                      <option
-                        key={employee}
-                        value={employee}
-                      >
-                        {employee}
-                      </option>
-                    )
-                  )}
-
+                  {employees.map((employee) => (
+                    <option
+                      key={employee}
+                      value={employee}
+                    >
+                      {employee}
+                    </option>
+                  ))}
                 </select>
-
               </div>
-
 
               {/* ПРОБЛЕМА */}
 
               <div className="md:col-span-2">
-
                 <label className="mb-2 block text-sm font-medium">
                   Проблема *
                 </label>
@@ -581,14 +691,11 @@ export default function Dashboard() {
                   placeholder="Опишите проблему"
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                 />
-
               </div>
-
 
               {/* КОММЕНТАРИЙ */}
 
               <div className="md:col-span-2">
-
                 <label className="mb-2 block text-sm font-medium">
                   Комментарий по проблеме
                 </label>
@@ -605,14 +712,11 @@ export default function Dashboard() {
                   rows={3}
                   className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                 />
-
               </div>
-
 
               {/* КУДА НАПРАВЛЕН */}
 
               <div>
-
                 <label className="mb-2 block text-sm font-medium">
                   Куда направлен запрос
                 </label>
@@ -629,14 +733,11 @@ export default function Dashboard() {
                   placeholder="Отдел / сотрудник"
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                 />
-
               </div>
 
-
-              {/* СРОК ВЫПОЛНЕНИЯ */}
+              {/* СРОК */}
 
               <div>
-
                 <label className="mb-2 block text-sm font-medium">
                   Срок выполнения
                 </label>
@@ -652,14 +753,11 @@ export default function Dashboard() {
                   }
                   className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                 />
-
               </div>
-
 
               {/* ПОСЛЕДУЮЩИЕ ШАГИ */}
 
               <div className="md:col-span-2">
-
                 <label className="mb-2 block text-sm font-medium">
                   Последующие шаги
                 </label>
@@ -676,14 +774,11 @@ export default function Dashboard() {
                   rows={3}
                   className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
                 />
-
               </div>
-
 
               {/* СТАТУС */}
 
               <div>
-
                 <label className="mb-2 block text-sm font-medium">
                   Статус *
                 </label>
@@ -698,28 +793,20 @@ export default function Dashboard() {
                   }
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
                 >
-
-                  {statuses.map(
-                    (status) => (
-                      <option
-                        key={status}
-                        value={status}
-                      >
-                        {status}
-                      </option>
-                    )
-                  )}
-
+                  {statuses.map((status) => (
+                    <option
+                      key={status}
+                      value={status}
+                    >
+                      {status}
+                    </option>
+                  ))}
                 </select>
-
               </div>
 
             </div>
 
-
-            {/* ==========================================
-                КНОПКИ
-            ========================================== */}
+            {/* КНОПКИ */}
 
             <div className="mt-6 flex justify-end gap-3">
 
@@ -732,18 +819,17 @@ export default function Dashboard() {
                 Отмена
               </button>
 
-
               <button
                 type="button"
-                onClick={addRequest}
+                onClick={saveRequest}
                 disabled={isSaving}
                 className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-
                 {isSaving
                   ? "Сохранение..."
+                  : editingId !== null
+                  ? "Сохранить изменения"
                   : "Сохранить запрос"}
-
               </button>
 
             </div>
@@ -751,15 +837,11 @@ export default function Dashboard() {
           </div>
         )}
 
-
-        {/* ==========================================
+        {/* ===================================================
             ТАБЛИЦА
-        ========================================== */}
+        =================================================== */}
 
         <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-
-
-          {/* ЗАГРУЗКА */}
 
           {isLoading ? (
 
@@ -779,11 +861,7 @@ export default function Dashboard() {
 
             </div>
 
-
           ) : requests.length === 0 ? (
-
-
-            /* НЕТ ЗАПРОСОВ */
 
             <div className="px-6 py-12 text-center">
 
@@ -801,15 +879,11 @@ export default function Dashboard() {
 
             </div>
 
-
           ) : (
-
-
-            /* ЕСТЬ ЗАПРОСЫ */
 
             <div className="overflow-x-auto">
 
-              <table className="w-full min-w-[1400px] text-left text-sm">
+              <table className="w-full min-w-[1550px] text-left text-sm">
 
                 <thead className="bg-slate-50">
 
@@ -855,79 +929,117 @@ export default function Dashboard() {
                       Статус
                     </th>
 
+                    <th className="px-4 py-4 font-semibold">
+                      Действия
+                    </th>
+
                   </tr>
 
                 </thead>
 
-
                 <tbody>
 
-                  {requests.map(
-                    (request) => (
+                  {requests.map((request) => (
 
-                      <tr
-                        key={request.id}
-                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                      >
+                    <tr
+                      key={request.id}
+                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                    >
 
-                        <td className="px-4 py-4 font-medium">
-                          {request.company}
-                        </td>
+                      <td className="px-4 py-4 font-medium">
+                        {request.company}
+                      </td>
 
-                        <td className="px-4 py-4">
-                          {request.bank}
-                        </td>
+                      <td className="px-4 py-4">
+                        {request.bank}
+                      </td>
 
-                        <td className="whitespace-nowrap px-4 py-4">
-                          {request.date}
-                        </td>
+                      <td className="whitespace-nowrap px-4 py-4">
+                        {request.date}
+                      </td>
 
-                        <td className="px-4 py-4">
-                          {request.problem}
-                        </td>
+                      <td className="px-4 py-4">
+                        {request.problem}
+                      </td>
 
-                        <td className="max-w-[250px] px-4 py-4">
-                          {request.comment || "—"}
-                        </td>
+                      <td className="max-w-[250px] px-4 py-4">
+                        {request.comment || "—"}
+                      </td>
 
-                        <td className="whitespace-nowrap px-4 py-4">
-                          {request.employee}
-                        </td>
+                      <td className="whitespace-nowrap px-4 py-4">
+                        {request.employee}
+                      </td>
 
-                        <td className="px-4 py-4">
-                          {request.destination || "—"}
-                        </td>
+                      <td className="px-4 py-4">
+                        {request.destination || "—"}
+                      </td>
 
-                        <td className="px-4 py-4">
-                          {request.nextSteps || "—"}
-                        </td>
+                      <td className="px-4 py-4">
+                        {request.nextSteps || "—"}
+                      </td>
 
-                        <td className="whitespace-nowrap px-4 py-4">
-                          {request.deadline || "—"}
-                        </td>
+                      <td className="whitespace-nowrap px-4 py-4">
+                        {request.deadline || "—"}
+                      </td>
 
-                        <td className="whitespace-nowrap px-4 py-4">
+                      <td className="whitespace-nowrap px-4 py-4">
 
-                          <span
-                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                              request.status ===
-                              "Закрыт"
-                                ? "bg-green-100 text-green-700"
-                                : request.status ===
-                                  "В работе"
-                                ? "bg-blue-100 text-blue-700"
-                                : "bg-yellow-100 text-yellow-700"
-                            }`}
+                        <span
+                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                            request.status === "Закрыт"
+                              ? "bg-green-100 text-green-700"
+                              : request.status === "В работе"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-yellow-100 text-yellow-700"
+                          }`}
+                        >
+                          {request.status}
+                        </span>
+
+                      </td>
+
+                      {/* ДЕЙСТВИЯ */}
+
+                      <td className="whitespace-nowrap px-4 py-4">
+
+                        <div className="flex gap-2">
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              editRequest(request)
+                            }
+                            className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
                           >
-                            {request.status}
-                          </span>
+                            Редактировать
+                          </button>
 
-                        </td>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              deleteRequest(
+                                request.id
+                              )
+                            }
+                            disabled={
+                              deletingId ===
+                              request.id
+                            }
+                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {deletingId ===
+                            request.id
+                              ? "Удаление..."
+                              : "Удалить"}
+                          </button>
 
-                      </tr>
+                        </div>
 
-                    )
-                  )}
+                      </td>
+
+                    </tr>
+
+                  ))}
 
                 </tbody>
 
@@ -940,7 +1052,6 @@ export default function Dashboard() {
         </div>
 
       </div>
-
     </section>
   );
 }
