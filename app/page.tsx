@@ -1,5 +1,7 @@
 import LogoutButton from "./LogoutButton";
 import Dashboard from "./dashboard";
+import WorkSchedule from "./work-schedule";
+
 const categories = [
   {
     title: "Регламент работы",
@@ -67,13 +69,21 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-slate-50 text-slate-900">
 
-      {/* HEADER */}
+      {/* =====================================================
+          HEADER
+      ===================================================== */}
+
       <header className="border-b border-slate-200 bg-white">
+
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
 
           {/* ЛОГОТИП */}
-          <a href="/" className="group">
-            <h1 className="text-2xl font-bold group-hover:text-blue-600">
+
+          <a
+            href="/"
+            className="group"
+          >
+            <h1 className="text-2xl font-bold transition group-hover:text-blue-600">
               База знаний
             </h1>
 
@@ -82,7 +92,9 @@ export default function Home() {
             </p>
           </a>
 
+
           {/* МЕНЮ */}
+
           <nav className="flex items-center gap-6 text-sm font-medium">
 
             <a
@@ -111,12 +123,30 @@ export default function Home() {
           </nav>
 
         </div>
+
       </header>
 
-      {/* DASHBOARD */}
+
+      {/* =====================================================
+          DASHBOARD
+      ===================================================== */}
+
       <Dashboard />
-      {/* HERO */}
+
+
+      {/* =====================================================
+          ГРАФИК РАБОТ
+      ===================================================== */}
+
+      <WorkSchedule />
+
+
+      {/* =====================================================
+          HERO / ЦЕНТР ПОМОЩИ
+      ===================================================== */}
+
       <section className="bg-blue-600">
+
         <div className="mx-auto max-w-7xl px-6 py-20">
 
           <div className="mx-auto max-w-3xl text-center text-white">
@@ -135,6 +165,7 @@ export default function Home() {
 
 
             {/* ПОИСК */}
+
             <div className="mt-8 flex overflow-hidden rounded-2xl bg-white shadow-xl">
 
               <input
@@ -155,16 +186,21 @@ export default function Home() {
           </div>
 
         </div>
+
       </section>
 
 
-      {/* CATEGORIES */}
+      {/* =====================================================
+          CATEGORIES
+      ===================================================== */}
+
       <section
         id="categories"
         className="mx-auto max-w-7xl px-6 py-16"
       >
 
         <div>
+
           <h2 className="text-2xl font-bold">
             Категории
           </h2>
@@ -172,12 +208,14 @@ export default function Home() {
           <p className="mt-2 text-slate-500">
             Выберите нужный раздел базы знаний
           </p>
+
         </div>
 
 
         <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
 
           {categories.map((category) => (
+
             <a
               key={category.title}
               href={category.href}
@@ -188,7 +226,7 @@ export default function Home() {
                 {category.icon}
               </div>
 
-              <h3 className="text-lg font-semibold group-hover:text-blue-600">
+              <h3 className="text-lg font-semibold transition group-hover:text-blue-600">
                 {category.title}
               </h3>
 
@@ -201,6 +239,7 @@ export default function Home() {
               </p>
 
             </a>
+
           ))}
 
         </div>
@@ -208,7 +247,10 @@ export default function Home() {
       </section>
 
 
-      {/* ARTICLES */}
+      {/* =====================================================
+          ARTICLES
+      ===================================================== */}
+
       <section
         id="articles"
         className="border-t border-slate-200 bg-white"
@@ -228,6 +270,7 @@ export default function Home() {
           <div className="mt-8 grid gap-4">
 
             {articles.map((article) => (
+
               <a
                 key={article.title}
                 href="#"
@@ -240,7 +283,7 @@ export default function Home() {
                     {article.category}
                   </p>
 
-                  <h3 className="mt-2 font-semibold group-hover:text-blue-600">
+                  <h3 className="mt-2 font-semibold transition group-hover:text-blue-600">
                     {article.title}
                   </h3>
 
@@ -255,6 +298,7 @@ export default function Home() {
                 </span>
 
               </a>
+
             ))}
 
           </div>
@@ -264,7 +308,10 @@ export default function Home() {
       </section>
 
 
-      {/* FOOTER */}
+      {/* =====================================================
+          FOOTER
+      ===================================================== */}
+
       <footer className="border-t border-slate-200 bg-slate-950 text-slate-400">
 
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-8 text-sm">
