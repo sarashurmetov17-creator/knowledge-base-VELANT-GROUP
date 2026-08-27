@@ -134,25 +134,29 @@ const emptyForm: FormData = {
 };
 
 export default function Dashboard() {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-
-  const [editingId, setEditingId] = useState<number | null>(null);
-
   const [requests, setRequests] = useState<RequestItem[]>([]);
 
   const [form, setForm] = useState<FormData>({
     ...emptyForm,
   });
 
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const [editingId, setEditingId] = useState<number | null>(
+    null
+  );
+
   const [isLoading, setIsLoading] = useState(true);
 
   const [isSaving, setIsSaving] = useState(false);
 
-  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(
+    null
+  );
 
-  // =========================================================
+  // =====================================================
   // ЗАГРУЗКА ЗАПРОСОВ
-  // =========================================================
+  // =====================================================
 
   async function loadRequests() {
     try {
@@ -163,27 +167,56 @@ export default function Dashboard() {
         cache: "no-store",
       });
 
-      const result = await response.json();
+      const text = await response.text();
+
+      let result: unknown = [];
+
+      if (text.trim()) {
+        try {
+          result = JSON.parse(text);
+        } catch (error) {
+          console.error(
+            "Не удалось разобрать ответ /api/requests:",
+            text,
+            error
+          );
+
+          throw new Error(
+            "Сервер вернул некорректный ответ"
+          );
+        }
+      }
 
       if (!response.ok) {
+        const errorResult = result as {
+          error?: string;
+        };
+
         throw new Error(
-          result.error || "Не удалось загрузить запросы"
+          errorResult?.error ||
+            `Ошибка загрузки запросов: ${response.status}`
+        );
+      }
+
+      if (!Array.isArray(result)) {
+        throw new Error(
+          "Сервер вернул неправильный формат данных"
         );
       }
 
       const formattedData: RequestItem[] = result.map(
         (item: any) => ({
-          id: item.id,
-          company: item.company,
-          bank: item.bank,
-          date: item.date,
-          problem: item.problem,
-          comment: item.comment,
-          employee: item.employee,
-          destination: item.destination,
-          nextSteps: item.next_steps,
-          deadline: item.deadline,
-          status: item.status,
+          id: Number(item.id),
+          company: item.company || "",
+          bank: item.bank || "",
+          date: item.date || "",
+          problem: item.problem || "",
+          comment: item.comment ?? null,
+          employee: item.employee || "",
+          destination: item.destination ?? null,
+          nextSteps: item.next_steps ?? null,
+          deadline: item.deadline ?? null,
+          status: item.status || "Контроль",
         })
       );
 
@@ -199,6 +232,8 @@ export default function Dashboard() {
           ? error.message
           : "Не удалось загрузить запросы"
       );
+
+      setRequests([]);
     } finally {
       setIsLoading(false);
     }
@@ -208,9 +243,9 @@ export default function Dashboard() {
     loadRequests();
   }, []);
 
-  // =========================================================
-  // ИЗМЕНЕНИЕ ПОЛЕЙ ФОРМЫ
-  // =========================================================
+  // =====================================================
+  // ИЗМЕНЕНИЕ ФОРМЫ
+  // =====================================================
 
   function updateForm(
     field: keyof FormData,
@@ -222,11 +257,11 @@ export default function Dashboard() {
     }));
   }
 
-  // =========================================================
-  // ОТКРЫТЬ ФОРМУ ДЛЯ НОВОГО ЗАПРОСА
-  // =========================================================
+  // =====================================================
+  // НОВЫЙ ЗАПРОС
+  // =====================================================
 
-  function openForm() {
+  function openNewForm() {
     setEditingId(null);
 
     setForm({
@@ -236,9 +271,9 @@ export default function Dashboard() {
     setIsFormOpen(true);
   }
 
-  // =========================================================
+  // =====================================================
   // РЕДАКТИРОВАНИЕ
-  // =========================================================
+  // =====================================================
 
   function editRequest(request: RequestItem) {
     setEditingId(request.id);
@@ -257,12 +292,20 @@ export default function Dashboard() {
     });
 
     setIsFormOpen(true);
+
+    setTimeout(() => {
+      document
+        .getElementById("dashboard-form")
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
+    }, 50);
   }
 
-  // =========================================================
+  // =====================================================
   // СОХРАНЕНИЕ
-  // НОВЫЙ ЗАПРОС ИЛИ РЕДАКТИРОВАНИЕ
-  // =========================================================
+  // =====================================================
 
   async function saveRequest() {
     if (
@@ -273,120 +316,175 @@ export default function Dashboard() {
       !form.employee ||
       !form.status
     ) {
-      alert("Заполните обязательные поля.");
+      alert(
+        "Заполните обязательные поля."
+      );
+
       return;
     }
 
     try {
       setIsSaving(true);
 
-      // =====================================================
+      // =================================================
       // РЕДАКТИРОВАНИЕ
-      // =====================================================
+      // =================================================
 
       if (editingId !== null) {
         const response = await fetch(
           `/api/requests/${editingId}`,
           {
             method: "PUT",
+
             headers: {
               "Content-Type": "application/json",
             },
+
             body: JSON.stringify(form),
           }
         );
 
-        const result = await response.json();
+        const text = await response.text();
+
+        let result: any = null;
+
+        if (text.trim()) {
+          try {
+            result = JSON.parse(text);
+          } catch {
+            throw new Error(
+              "Сервер вернул некорректный ответ при редактировании"
+            );
+          }
+        }
 
         if (!response.ok) {
           throw new Error(
-            result.error ||
-              "Не удалось изменить запрос"
+            result?.error ||
+              `Не удалось изменить запрос: ${response.status}`
+          );
+        }
+
+        if (!result) {
+          throw new Error(
+            "Сервер не вернул изменённую запись"
           );
         }
 
         const updatedRequest: RequestItem = {
-          id: result.id,
-          company: result.company,
-          bank: result.bank,
-          date: result.date,
-          problem: result.problem,
-          comment: result.comment,
-          employee: result.employee,
-          destination: result.destination,
-          nextSteps: result.next_steps,
-          deadline: result.deadline,
-          status: result.status,
+          id: Number(result.id),
+          company: result.company || "",
+          bank: result.bank || "",
+          date: result.date || "",
+          problem: result.problem || "",
+          comment: result.comment ?? null,
+          employee: result.employee || "",
+          destination: result.destination ?? null,
+          nextSteps: result.next_steps ?? null,
+          deadline: result.deadline ?? null,
+          status:
+            result.status || "Контроль",
         };
 
         setRequests((prev) =>
-          prev.map((item) =>
-            item.id === editingId
+          prev.map((request) =>
+            request.id === editingId
               ? updatedRequest
-              : item
+              : request
           )
         );
 
-        alert("Запрос успешно изменён.");
-      }
+        setForm({
+          ...emptyForm,
+        });
 
-      // =====================================================
-      // НОВЫЙ ЗАПРОС
-      // =====================================================
+        setEditingId(null);
+        setIsFormOpen(false);
 
-      else {
-        const response = await fetch(
-          "/api/requests",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(form),
-          }
+        alert(
+          "Запрос успешно изменён."
         );
 
-        const result = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            result.error ||
-              "Не удалось сохранить запрос"
-          );
-        }
-
-        const newRequest: RequestItem = {
-          id: result.id,
-          company: result.company,
-          bank: result.bank,
-          date: result.date,
-          problem: result.problem,
-          comment: result.comment,
-          employee: result.employee,
-          destination: result.destination,
-          nextSteps: result.next_steps,
-          deadline: result.deadline,
-          status: result.status,
-        };
-
-        setRequests((prev) => [
-          newRequest,
-          ...prev,
-        ]);
+        return;
       }
 
-      // =====================================================
-      // ОЧИЩАЕМ ФОРМУ
-      // =====================================================
+      // =================================================
+      // НОВЫЙ ЗАПРОС
+      // =================================================
+
+      const response = await fetch(
+        "/api/requests",
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+          },
+
+          body: JSON.stringify(form),
+        }
+      );
+
+      const text = await response.text();
+
+      let result: any = null;
+
+      if (text.trim()) {
+        try {
+          result = JSON.parse(text);
+        } catch {
+          throw new Error(
+            "Сервер вернул некорректный ответ при создании запроса"
+          );
+        }
+      }
+
+      if (!response.ok) {
+        throw new Error(
+          result?.error ||
+            `Не удалось сохранить запрос: ${response.status}`
+        );
+      }
+
+      if (!result) {
+        throw new Error(
+          "Сервер не вернул созданную запись"
+        );
+      }
+
+      const newRequest: RequestItem = {
+        id: Number(result.id),
+        company: result.company || "",
+        bank: result.bank || "",
+        date: result.date || "",
+        problem: result.problem || "",
+        comment: result.comment ?? null,
+        employee: result.employee || "",
+        destination:
+          result.destination ?? null,
+        nextSteps:
+          result.next_steps ?? null,
+        deadline:
+          result.deadline ?? null,
+        status:
+          result.status || "Контроль",
+      };
+
+      setRequests((prev) => [
+        newRequest,
+        ...prev,
+      ]);
 
       setForm({
         ...emptyForm,
       });
 
       setEditingId(null);
-
       setIsFormOpen(false);
 
+      alert(
+        "Запрос успешно добавлен."
+      );
     } catch (error) {
       console.error(
         "Ошибка сохранения:",
@@ -403,14 +501,15 @@ export default function Dashboard() {
     }
   }
 
-  // =========================================================
+  // =====================================================
   // УДАЛЕНИЕ
-  // =========================================================
+  // =====================================================
 
   async function deleteRequest(id: number) {
-    const confirmed = window.confirm(
-      "Вы действительно хотите удалить этот запрос?"
-    );
+    const confirmed =
+      window.confirm(
+        "Вы действительно хотите удалить этот запрос?"
+      );
 
     if (!confirmed) {
       return;
@@ -426,21 +525,47 @@ export default function Dashboard() {
         }
       );
 
-      const result = await response.json();
+      const text = await response.text();
+
+      let result: any = null;
+
+      if (text.trim()) {
+        try {
+          result = JSON.parse(text);
+        } catch {
+          throw new Error(
+            "Сервер вернул некорректный ответ при удалении"
+          );
+        }
+      }
 
       if (!response.ok) {
         throw new Error(
-          result.error ||
-            "Не удалось удалить запрос"
+          result?.error ||
+            `Не удалось удалить запрос: ${response.status}`
         );
       }
 
       setRequests((prev) =>
         prev.filter(
-          (request) => request.id !== id
+          (request) =>
+            request.id !== id
         )
       );
 
+      if (editingId === id) {
+        setEditingId(null);
+
+        setForm({
+          ...emptyForm,
+        });
+
+        setIsFormOpen(false);
+      }
+
+      alert(
+        "Запрос успешно удалён."
+      );
     } catch (error) {
       console.error(
         "Ошибка удаления:",
@@ -457,9 +582,9 @@ export default function Dashboard() {
     }
   }
 
-  // =========================================================
+  // =====================================================
   // ЗАКРЫТИЕ ФОРМЫ
-  // =========================================================
+  // =====================================================
 
   function closeForm() {
     if (isSaving) {
@@ -475,9 +600,9 @@ export default function Dashboard() {
     setIsFormOpen(false);
   }
 
-  // =========================================================
-  // HTML
-  // =========================================================
+  // =====================================================
+  // ОТОБРАЖЕНИЕ
+  // =====================================================
 
   return (
     <section
@@ -486,9 +611,9 @@ export default function Dashboard() {
     >
       <div className="mx-auto max-w-7xl px-6 py-12">
 
-        {/* ===================================================
+        {/* =================================================
             HEADER
-        =================================================== */}
+        ================================================= */}
 
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
 
@@ -508,7 +633,7 @@ export default function Dashboard() {
 
           <button
             type="button"
-            onClick={openForm}
+            onClick={openNewForm}
             className="rounded-xl bg-blue-600 px-5 py-3 font-semibold text-white shadow-sm transition hover:bg-blue-700"
           >
             + Добавить запрос
@@ -516,19 +641,21 @@ export default function Dashboard() {
 
         </div>
 
-        {/* ===================================================
+        {/* =================================================
             ФОРМА
-        =================================================== */}
+        ================================================= */}
 
         {isFormOpen && (
-          <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-
-            {/* Заголовок */}
+          <div
+            id="dashboard-form"
+            className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm"
+          >
 
             <div className="flex items-center justify-between">
 
               <div>
-                <h3 className="text-lg font-bold">
+
+                <h3 className="text-lg font-bold text-slate-900">
                   {editingId !== null
                     ? "Редактирование запроса"
                     : "Новый запрос"}
@@ -539,20 +666,20 @@ export default function Dashboard() {
                     ? "Измените необходимые данные"
                     : "Заполните информацию по задаче"}
                 </p>
+
               </div>
 
               <button
                 type="button"
                 onClick={closeForm}
                 disabled={isSaving}
-                className="text-2xl text-slate-400 hover:text-slate-700 disabled:opacity-50"
+                className="text-2xl text-slate-400 transition hover:text-slate-700 disabled:opacity-50"
               >
                 ×
               </button>
 
             </div>
 
-            {/* Поля */}
 
             <div className="mt-6 grid gap-5 md:grid-cols-2">
 
@@ -571,22 +698,26 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 >
                   <option value="">
                     Выберите компанию
                   </option>
 
-                  {companies.map((company) => (
-                    <option
-                      key={company}
-                      value={company}
-                    >
-                      {company}
-                    </option>
-                  ))}
+                  {companies.map(
+                    (company) => (
+                      <option
+                        key={company}
+                        value={company}
+                      >
+                        {company}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
+
 
               {/* БАНК */}
 
@@ -603,22 +734,26 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 >
                   <option value="">
                     Выберите банк
                   </option>
 
-                  {banks.map((bank) => (
-                    <option
-                      key={bank}
-                      value={bank}
-                    >
-                      {bank}
-                    </option>
-                  ))}
+                  {banks.map(
+                    (bank) => (
+                      <option
+                        key={bank}
+                        value={bank}
+                      >
+                        {bank}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
+
 
               {/* ДАТА */}
 
@@ -636,11 +771,13 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 />
               </div>
 
-              {/* СОТРУДНИК */}
+
+              {/* КТО ПРИНЯЛ */}
 
               <div>
                 <label className="mb-2 block text-sm font-medium">
@@ -655,22 +792,26 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 >
                   <option value="">
                     Выберите сотрудника
                   </option>
 
-                  {employees.map((employee) => (
-                    <option
-                      key={employee}
-                      value={employee}
-                    >
-                      {employee}
-                    </option>
-                  ))}
+                  {employees.map(
+                    (employee) => (
+                      <option
+                        key={employee}
+                        value={employee}
+                      >
+                        {employee}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
+
 
               {/* ПРОБЛЕМА */}
 
@@ -688,10 +829,12 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
+                  disabled={isSaving}
                   placeholder="Опишите проблему"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 />
               </div>
+
 
               {/* КОММЕНТАРИЙ */}
 
@@ -708,11 +851,13 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
+                  disabled={isSaving}
                   placeholder="Дополнительная информация"
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 />
               </div>
+
 
               {/* КУДА НАПРАВЛЕН */}
 
@@ -730,10 +875,12 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
+                  disabled={isSaving}
                   placeholder="Отдел / сотрудник"
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 />
               </div>
+
 
               {/* СРОК */}
 
@@ -751,9 +898,11 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 />
               </div>
+
 
               {/* ПОСЛЕДУЮЩИЕ ШАГИ */}
 
@@ -770,11 +919,13 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
+                  disabled={isSaving}
                   placeholder="Что необходимо сделать дальше"
                   rows={3}
-                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500"
+                  className="w-full resize-none rounded-xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 />
               </div>
+
 
               {/* СТАТУС */}
 
@@ -791,20 +942,24 @@ export default function Dashboard() {
                       e.target.value
                     )
                   }
-                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none focus:border-blue-500"
+                  disabled={isSaving}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 disabled:bg-slate-100"
                 >
-                  {statuses.map((status) => (
-                    <option
-                      key={status}
-                      value={status}
-                    >
-                      {status}
-                    </option>
-                  ))}
+                  {statuses.map(
+                    (status) => (
+                      <option
+                        key={status}
+                        value={status}
+                      >
+                        {status}
+                      </option>
+                    )
+                  )}
                 </select>
               </div>
 
             </div>
+
 
             {/* КНОПКИ */}
 
@@ -837,9 +992,10 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ===================================================
+
+        {/* =================================================
             ТАБЛИЦА
-        =================================================== */}
+        ================================================= */}
 
         <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
@@ -883,7 +1039,7 @@ export default function Dashboard() {
 
             <div className="overflow-x-auto">
 
-              <table className="w-full min-w-[1550px] text-left text-sm">
+              <table className="w-full min-w-[1650px] text-left text-sm">
 
                 <thead className="bg-slate-50">
 
@@ -939,107 +1095,119 @@ export default function Dashboard() {
 
                 <tbody>
 
-                  {requests.map((request) => (
+                  {requests.map(
+                    (request) => (
 
-                    <tr
-                      key={request.id}
-                      className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
-                    >
+                      <tr
+                        key={request.id}
+                        className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                      >
 
-                      <td className="px-4 py-4 font-medium">
-                        {request.company}
-                      </td>
+                        <td className="px-4 py-4 font-medium">
+                          {request.company}
+                        </td>
 
-                      <td className="px-4 py-4">
-                        {request.bank}
-                      </td>
+                        <td className="px-4 py-4">
+                          {request.bank}
+                        </td>
 
-                      <td className="whitespace-nowrap px-4 py-4">
-                        {request.date}
-                      </td>
+                        <td className="whitespace-nowrap px-4 py-4">
+                          {request.date}
+                        </td>
 
-                      <td className="px-4 py-4">
-                        {request.problem}
-                      </td>
+                        <td className="max-w-[250px] px-4 py-4">
+                          {request.problem}
+                        </td>
 
-                      <td className="max-w-[250px] px-4 py-4">
-                        {request.comment || "—"}
-                      </td>
+                        <td className="max-w-[250px] px-4 py-4">
+                          {request.comment || "—"}
+                        </td>
 
-                      <td className="whitespace-nowrap px-4 py-4">
-                        {request.employee}
-                      </td>
+                        <td className="whitespace-nowrap px-4 py-4">
+                          {request.employee}
+                        </td>
 
-                      <td className="px-4 py-4">
-                        {request.destination || "—"}
-                      </td>
+                        <td className="px-4 py-4">
+                          {request.destination || "—"}
+                        </td>
 
-                      <td className="px-4 py-4">
-                        {request.nextSteps || "—"}
-                      </td>
+                        <td className="max-w-[250px] px-4 py-4">
+                          {request.nextSteps || "—"}
+                        </td>
 
-                      <td className="whitespace-nowrap px-4 py-4">
-                        {request.deadline || "—"}
-                      </td>
+                        <td className="whitespace-nowrap px-4 py-4">
+                          {request.deadline || "—"}
+                        </td>
 
-                      <td className="whitespace-nowrap px-4 py-4">
+                        <td className="whitespace-nowrap px-4 py-4">
 
-                        <span
-                          className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                            request.status === "Закрыт"
-                              ? "bg-green-100 text-green-700"
-                              : request.status === "В работе"
-                              ? "bg-blue-100 text-blue-700"
-                              : "bg-yellow-100 text-yellow-700"
-                          }`}
-                        >
-                          {request.status}
-                        </span>
-
-                      </td>
-
-                      {/* ДЕЙСТВИЯ */}
-
-                      <td className="whitespace-nowrap px-4 py-4">
-
-                        <div className="flex gap-2">
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              editRequest(request)
-                            }
-                            className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
+                          <span
+                            className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                              request.status ===
+                              "Закрыт"
+                                ? "bg-green-100 text-green-700"
+                                : request.status ===
+                                  "В работе"
+                                ? "bg-blue-100 text-blue-700"
+                                : "bg-yellow-100 text-yellow-700"
+                            }`}
                           >
-                            Редактировать
-                          </button>
+                            {request.status}
+                          </span>
 
-                          <button
-                            type="button"
-                            onClick={() =>
-                              deleteRequest(
+                        </td>
+
+
+                        {/* ДЕЙСТВИЯ */}
+
+                        <td className="whitespace-nowrap px-4 py-4">
+
+                          <div className="flex gap-2">
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                editRequest(
+                                  request
+                                )
+                              }
+                              disabled={
+                                deletingId ===
                                 request.id
-                              )
-                            }
-                            disabled={
-                              deletingId ===
+                              }
+                              className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              ✏️ Редактировать
+                            </button>
+
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                deleteRequest(
+                                  request.id
+                                )
+                              }
+                              disabled={
+                                deletingId ===
+                                request.id
+                              }
+                              className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {deletingId ===
                               request.id
-                            }
-                            className="rounded-lg bg-red-50 px-3 py-2 text-xs font-semibold text-red-600 transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                          >
-                            {deletingId ===
-                            request.id
-                              ? "Удаление..."
-                              : "Удалить"}
-                          </button>
+                                ? "Удаление..."
+                                : "🗑️ Удалить"}
+                            </button>
 
-                        </div>
+                          </div>
 
-                      </td>
+                        </td>
 
-                    </tr>
+                      </tr>
 
-                  ))}
+                    )
+                  )}
 
                 </tbody>
 
