@@ -1,23 +1,15 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl =
-  process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-const supabaseKey =
-  process.env.SUPABASE_SECRET_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SECRET_KEY;
 
 if (!supabaseUrl) {
-  throw new Error(
-    "NEXT_PUBLIC_SUPABASE_URL не задан"
-  );
+  throw new Error("NEXT_PUBLIC_SUPABASE_URL не задан");
 }
 
 if (!supabaseKey) {
-  throw new Error(
-    "SUPABASE_SECRET_KEY или NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY не задан"
-  );
+  throw new Error("SUPABASE_SECRET_KEY не задан");
 }
 
 const supabase = createClient(
@@ -27,20 +19,64 @@ const supabase = createClient(
 
 
 // =====================================================
-// PUT — РЕДАКТИРОВАНИЕ
+// GET — получить все запросы
 // =====================================================
 
-export async function PUT(
-  request: Request,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
+export async function GET() {
+  try {
+    const { data, error } = await supabase
+      .from("requests")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      });
+
+    if (error) {
+      console.error(
+        "Ошибка получения запросов:",
+        error
+      );
+
+      return NextResponse.json(
+        {
+          error: error.message,
+        },
+        {
+          status: 500,
+        }
+      );
+    }
+
+    return NextResponse.json(
+      data || []
+    );
+
+  } catch (error) {
+    console.error(
+      "GET /api/requests:",
+      error
+    );
+
+    return NextResponse.json(
+      {
+        error: "Ошибка сервера",
+      },
+      {
+        status: 500,
+      }
+    );
   }
+}
+
+
+// =====================================================
+// POST — создать новый запрос
+// =====================================================
+
+export async function POST(
+  request: Request
 ) {
   try {
-    const { id } = await context.params;
-
     const body = await request.json();
 
     const {
@@ -57,7 +93,9 @@ export async function PUT(
     } = body;
 
 
-    // Проверяем обязательные поля
+    // -----------------------------------------------
+    // Проверка обязательных полей
+    // -----------------------------------------------
 
     if (
       !company ||
@@ -79,42 +117,46 @@ export async function PUT(
     }
 
 
-    // Обновляем запись
+    // -----------------------------------------------
+    // Создание записи в Supabase
+    // -----------------------------------------------
 
     const { data, error } =
       await supabase
         .from("requests")
-        .update({
-          company,
-          bank,
-          date,
-          problem,
+        .insert({
+          company: company,
+          bank: bank,
+          date: date,
+          problem: problem,
           comment:
             comment || null,
-          employee,
+          employee: employee,
           destination:
             destination || null,
           next_steps:
             nextSteps || null,
           deadline:
             deadline || null,
-          status,
+          status: status,
         })
-        .eq("id", id)
         .select()
         .single();
 
 
+    // -----------------------------------------------
+    // Обработка ошибки
+    // -----------------------------------------------
+
     if (error) {
       console.error(
-        "Ошибка редактирования:",
+        "Ошибка добавления:",
         error
       );
 
       return NextResponse.json(
         {
-          error:
-            "Не удалось изменить запрос",
+          error: error.message,
         },
         {
           status: 500,
@@ -123,80 +165,29 @@ export async function PUT(
     }
 
 
-    return NextResponse.json(data);
-
-  } catch (error) {
-    console.error(
-      "Ошибка PUT:",
-      error
-    );
+    // -----------------------------------------------
+    // Возвращаем созданную запись
+    // -----------------------------------------------
 
     return NextResponse.json(
+      data,
       {
-        error: "Ошибка сервера",
-      },
-      {
-        status: 500,
+        status: 201,
       }
     );
-  }
-}
-
-
-// =====================================================
-// DELETE — УДАЛЕНИЕ
-// =====================================================
-
-export async function DELETE(
-  request: Request,
-  context: {
-    params: Promise<{
-      id: string;
-    }>;
-  }
-) {
-  try {
-    const { id } = await context.params;
-
-
-    const { error } =
-      await supabase
-        .from("requests")
-        .delete()
-        .eq("id", id);
-
-
-    if (error) {
-      console.error(
-        "Ошибка удаления:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error:
-            "Не удалось удалить запрос",
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-
-    return NextResponse.json({
-      success: true,
-    });
 
   } catch (error) {
     console.error(
-      "Ошибка DELETE:",
+      "POST /api/requests:",
       error
     );
 
     return NextResponse.json(
       {
-        error: "Ошибка сервера",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Ошибка сервера",
       },
       {
         status: 500,
