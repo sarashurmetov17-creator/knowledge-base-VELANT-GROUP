@@ -1,5 +1,5 @@
 import LogoutButton from "./LogoutButton";
-
+import Dashboard from "./dashboard";
 const categories = [
   {
     title: "Регламент работы",
@@ -113,7 +113,8 @@ export default function Home() {
         </div>
       </header>
 
-
+      {/* DASHBOARD */}
+      <Dashboard />
       {/* HERO */}
       <section className="bg-blue-600">
         <div className="mx-auto max-w-7xl px-6 py-20">
