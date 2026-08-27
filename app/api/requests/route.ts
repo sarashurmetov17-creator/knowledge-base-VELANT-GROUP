@@ -19,162 +19,23 @@ const supabase = createClient(
 
 
 // =====================================================
-// GET — получить все запросы
-// =====================================================
-
-export async function GET() {
-  try {
-    const { data, error } = await supabase
-      .from("requests")
-      .select("*")
-      .order("created_at", {
-        ascending: false,
-      });
-
-    if (error) {
-      console.error(
-        "Ошибка получения запросов:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error: error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-    return NextResponse.json(data);
-
-  } catch (error) {
-    console.error(error);
-
-    return NextResponse.json(
-      {
-        error: "Ошибка сервера",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-
-// =====================================================
-// POST — создать новый запрос
-// =====================================================
-
-export async function POST(request: Request) {
-  try {
-    const body = await request.json();
-
-    const {
-      company,
-      bank,
-      date,
-      problem,
-      comment,
-      employee,
-      destination,
-      nextSteps,
-      deadline,
-      status,
-    } = body;
-
-
-    // Проверяем обязательные поля
-
-    if (
-      !company ||
-      !bank ||
-      !date ||
-      !problem ||
-      !employee ||
-      !status
-    ) {
-      return NextResponse.json(
-        {
-          error: "Не заполнены обязательные поля",
-        },
-        {
-          status: 400,
-        }
-      );
-    }
-
-
-    // Добавляем запись
-
-    const { data, error } = await supabase
-      .from("requests")
-      .insert([
-        {
-          company,
-          bank,
-          date,
-          problem,
-          comment: comment || null,
-          employee,
-          destination: destination || null,
-          next_steps: nextSteps || null,
-          deadline: deadline || null,
-          status,
-        },
-      ])
-      .select()
-      .single();
-
-
-    if (error) {
-      console.error(
-        "Ошибка добавления:",
-        error
-      );
-
-      return NextResponse.json(
-        {
-          error: error.message,
-        },
-        {
-          status: 500,
-        }
-      );
-    }
-
-
-    return NextResponse.json(data, {
-      status: 201,
-    });
-
-  } catch (error) {
-    console.error(error);
-
-    return NextResponse.json(
-      {
-        error: "Ошибка сервера",
-      },
-      {
-        status: 500,
-      }
-    );
-  }
-}
-
-
-// =====================================================
 // PUT — редактировать существующий запрос
 // =====================================================
 
-export async function PUT(request: Request) {
+export async function PUT(
+  request: Request,
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  }
+) {
   try {
+    const { id } = await context.params;
+
     const body = await request.json();
 
     const {
-      id,
       company,
       bank,
       date,
@@ -188,7 +49,9 @@ export async function PUT(request: Request) {
     } = body;
 
 
+    // -----------------------------------------------
     // Проверяем ID
+    // -----------------------------------------------
 
     if (!id) {
       return NextResponse.json(
@@ -202,7 +65,9 @@ export async function PUT(request: Request) {
     }
 
 
+    // -----------------------------------------------
     // Проверяем обязательные поля
+    // -----------------------------------------------
 
     if (
       !company ||
@@ -223,26 +88,33 @@ export async function PUT(request: Request) {
     }
 
 
+    // -----------------------------------------------
     // Обновляем запись
+    // -----------------------------------------------
 
-    const { data, error } = await supabase
-      .from("requests")
-      .update({
-        company,
-        bank,
-        date,
-        problem,
-        comment: comment || null,
-        employee,
-        destination: destination || null,
-        next_steps: nextSteps || null,
-        deadline: deadline || null,
-        status,
-      })
-      .eq("id", id)
-      .select()
-      .single();
+    const { data, error } =
+      await supabase
+        .from("requests")
+        .update({
+          company: company,
+          bank: bank,
+          date: date,
+          problem: problem,
+          comment: comment || null,
+          employee: employee,
+          destination: destination || null,
+          next_steps: nextSteps || null,
+          deadline: deadline || null,
+          status: status,
+        })
+        .eq("id", id)
+        .select()
+        .single();
 
+
+    // -----------------------------------------------
+    // Обработка ошибки
+    // -----------------------------------------------
 
     if (error) {
       console.error(
@@ -261,14 +133,24 @@ export async function PUT(request: Request) {
     }
 
 
+    // -----------------------------------------------
+    // Возвращаем изменённую запись
+    // -----------------------------------------------
+
     return NextResponse.json(data);
 
   } catch (error) {
-    console.error(error);
+    console.error(
+      "PUT /api/requests/[id]:",
+      error
+    );
 
     return NextResponse.json(
       {
-        error: "Ошибка сервера",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Ошибка сервера",
       },
       {
         status: 500,
@@ -279,17 +161,24 @@ export async function PUT(request: Request) {
 
 
 // =====================================================
-// DELETE — удалить запрос
+// DELETE — удалить существующий запрос
 // =====================================================
 
-export async function DELETE(request: Request) {
+export async function DELETE(
+  request: Request,
+  context: {
+    params: Promise<{
+      id: string;
+    }>;
+  }
+) {
   try {
-    const body = await request.json();
-
-    const { id } = body;
+    const { id } = await context.params;
 
 
+    // -----------------------------------------------
     // Проверяем ID
+    // -----------------------------------------------
 
     if (!id) {
       return NextResponse.json(
@@ -303,13 +192,20 @@ export async function DELETE(request: Request) {
     }
 
 
+    // -----------------------------------------------
     // Удаляем запись
+    // -----------------------------------------------
 
-    const { error } = await supabase
-      .from("requests")
-      .delete()
-      .eq("id", id);
+    const { error } =
+      await supabase
+        .from("requests")
+        .delete()
+        .eq("id", id);
 
+
+    // -----------------------------------------------
+    // Обработка ошибки
+    // -----------------------------------------------
 
     if (error) {
       console.error(
@@ -328,16 +224,26 @@ export async function DELETE(request: Request) {
     }
 
 
+    // -----------------------------------------------
+    // Успешное удаление
+    // -----------------------------------------------
+
     return NextResponse.json({
       success: true,
     });
 
   } catch (error) {
-    console.error(error);
+    console.error(
+      "DELETE /api/requests/[id]:",
+      error
+    );
 
     return NextResponse.json(
       {
-        error: "Ошибка сервера",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Ошибка сервера",
       },
       {
         status: 500,
